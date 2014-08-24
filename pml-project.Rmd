@@ -1,0 +1,79 @@
+# Assignment of Practical Machine Learning for Weight Lifting Exercises Dataset
+
+by *Weifeng Zhang*
+
+## Introduction
+
+Nowadays, some devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* are possible to collect a large amount of data about personal activity relatively inexpensively, which will improve the users' health and find patterns in their behavior. However, the users regularly quantify how much of a particular activity they do rather than how well they do it.
+
+In this project, some data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants will be used to judge their activity pattern. These data is provided [here](http://groupware.les.inf.puc-rio.br/har "Information on Weight Lifting Exercise Dataset") where more information is available in the section, *Weight Lifting Exercise Dataset*.
+
+## Getting Dataset for Training
+
+The dataset for training can be downloaded to the working directory [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv "Download Dataset for Training"), or using the code below.
+
+```{r download, results = "hide", cache = TRUE}
+file.url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+file.name <- "pml-training.csv"
+download.file(file.url, file.name, method = "curl")
+```
+
+## Loading and Processing Data
+
+Read the dataset for training as a `data frame` with R language.
+
+```{r load, results = "hide"}
+rawdata <- read.csv(file.name, stringsAsFactors = FALSE)
+```
+
+Some variables in the dataset seem useless to predict the outcome, which should be cleaned up. They are either the variables unlikely related to the outcome (e.g. `X`, `user_name`, `timestamp`), or ones most of which are `NA` (e.g. the statistical variables). More discussion regarding the variables `new_window` and `num_window`, please refer to [this thread](https://class.coursera.org/predmachlearn-004/forum/thread?thread_id=84 "Discussion about Two Special Variables").
+
+```{r subset}
+discard <- c(1:7, 12:36, 50:59, 69:83, 87:101, 103:112, 125:139, 141:150)
+data <- rawdata[, -discard]
+data$classe <- as.factor(data$classe)
+```
+
+## Machine Learning
+
+After tidying up the data, split it into two parts for *training* and *testing* respectively.
+
+```{r split, results = "hide"}
+library(caret)
+in.train <- createDataPartition(y = data$classe, p = 0.75, list = FALSE)
+training <- data[in.train, ]
+testing <- data[-in.train, ]
+```
+
+Train the data for *training* using the method **Random Forests**. In order to control the running time, use function `trainControl` first.
+
+```{r train, results = "hide", cache = TRUE}
+trControl <- trainControl(method = "cv", number = 4, allowParallel = TRUE, verboseIter = TRUE)
+mod.fit <- train(classe ~ . , data = training, method = "rf", trControl = trControl)
+```
+
+```{r modinformation, echo = FALSE}
+print(mod.fit)
+```
+
+The accuracy of this model is around 0.99. So apply it for the dataset for *testing* and calculate its accuracy.
+
+```{r test}
+pred <- predict(mod.fit, testing)
+confusionMatrix(pred, testing$classe)
+```
+
+The accuracy where the model is applied for the data for *testing* is above 0.99.
+Therefore, it can be used to predict the outcome.
+
+## Discussion
+
+The predicting model described above is built with the algorithm **Random Forests** which is good at *accuracy*. But it also has some disadvantages, of which most important one may be *overfitting*. To avoid it, a part of data is split for *testing* of out-of-sample. The accuracy is acceptable.
+
+Before the establishment of the model, the data is processed with the cut of some variables, including two whose meanings are not absolutely clear. This process may affect the final model to make the testing of out-of-sample or cross-validation error.
+
+## Acknowledge
+
+Thanks to all the contributors of the *WLE* dataset. Their work is cited as below.
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. [Qualitative Activity Recognition of Weight Lifting Exercises](http://groupware.les.inf.puc-rio.br/work.jsf?p1=11201 "Qualitative Activity Recognition of Weight Lifting Exercises"). Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
